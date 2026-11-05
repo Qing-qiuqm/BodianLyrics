@@ -352,11 +352,35 @@ class LyricOverlay
 
     static string fontName = null;
     static FontStyle fontStyle = FontStyle.Regular;
+    static string lastConfiguredFont = null;
 
-    // 优先使用系统内的苹方，缺失时退回微软雅黑
-    static void EnsureFont()
+    // 若 config 指定了字体则用之；否则优先苹方，缺失时退回微软雅黑
+    static void EnsureFont(string configuredFont)
     {
-        if (fontName != null) return;
+        if (fontName != null && lastConfiguredFont == configuredFont) return;
+        lastConfiguredFont = configuredFont;
+        fontName = null;
+
+        // 用户显式指定了字体：校验是否已安装
+        if (configuredFont != null && configuredFont.Length > 0)
+        {
+            try
+            {
+                System.Drawing.Text.InstalledFontCollection col = new System.Drawing.Text.InstalledFontCollection();
+                for (int j = 0; j < col.Families.Length; j++)
+                {
+                    if (col.Families[j].Name.Equals(configuredFont, StringComparison.OrdinalIgnoreCase))
+                    {
+                        fontName = configuredFont;
+                        fontStyle = FontStyle.Regular;
+                        return;
+                    }
+                }
+            }
+            catch { }
+        }
+
+        // 自动选择：苹方优先，回退微软雅黑粗体
         fontName = "Microsoft YaHei UI";
         fontStyle = FontStyle.Bold;
         try
@@ -406,7 +430,7 @@ class LyricOverlay
 
             Font font = null;
             float tw = 0;
-            EnsureFont();
+            EnsureFont(cfg.FontName);
             float maxWidth = w - 34;
             for (float size = cfg.FontSize; size >= 11; size -= 1)
             {
