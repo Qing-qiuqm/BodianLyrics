@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.IO;
@@ -19,8 +19,8 @@ class TrayApp
     NotifyIcon tray;
     Timer pollTimer;
     Timer syncTimer;
-    ToolStripMenuItem miShow;
     ToolStripMenuItem miAutoStart;
+    SettingsForm settings;
 
     double oddPos = -1;
     int oddCount = 0;
@@ -77,99 +77,25 @@ class TrayApp
 
         ContextMenuStrip menu = new ContextMenuStrip();
 
-        miShow = new ToolStripMenuItem("显示歌词");
-        miShow.CheckOnClick = true;
-        miShow.Checked = cfg.Enabled;
-        miShow.Click += new EventHandler(delegate { overlay.SetVisible(miShow.Checked); });
-
-        ToolStripMenuItem play = new ToolStripMenuItem("播放 / 暂停");
-        play.Click += new EventHandler(delegate { controller.ClickPlayPause(); });
-
-        ToolStripMenuItem prev = new ToolStripMenuItem("上一首");
-        prev.Click += new EventHandler(delegate { controller.ClickPrevious(); });
-
-        ToolStripMenuItem next = new ToolStripMenuItem("下一首");
-        next.Click += new EventHandler(delegate { controller.ClickNext(); });
-
-        ToolStripMenuItem left = new ToolStripMenuItem("左移 20px");
-        left.Click += new EventHandler(delegate { cfg.RightMargin += 20; cfg.Save(); overlay.Reposition(); });
-
-        ToolStripMenuItem right = new ToolStripMenuItem("右移 20px");
-        right.Click += new EventHandler(delegate { cfg.RightMargin -= 20; cfg.Save(); overlay.Reposition(); });
-
-        ToolStripMenuItem up = new ToolStripMenuItem("上移 5px");
-        up.Click += new EventHandler(delegate { cfg.OffsetY -= 5; cfg.Save(); overlay.Reposition(); });
-
-        ToolStripMenuItem down = new ToolStripMenuItem("下移 5px");
-        down.Click += new EventHandler(delegate { cfg.OffsetY += 5; cfg.Save(); overlay.Reposition(); });
-
-        ToolStripMenuItem reset = new ToolStripMenuItem("恢复默认位置");
-        reset.Click += new EventHandler(delegate { cfg.RightMargin = 460; cfg.OffsetY = 0; cfg.Save(); overlay.Reposition(); });
-
-        ToolStripMenuItem bigger = new ToolStripMenuItem("字号 +1");
-        bigger.Click += new EventHandler(delegate
-        {
-            cfg.FontSize = Math.Min(32f, cfg.FontSize + 1f);
-            cfg.Save();
-        });
-
-        ToolStripMenuItem smaller = new ToolStripMenuItem("字号 -1");
-        smaller.Click += new EventHandler(delegate
-        {
-            cfg.FontSize = Math.Max(12f, cfg.FontSize - 1f);
-            cfg.Save();
-        });
-
         miAutoStart = new ToolStripMenuItem("开机自启");
         miAutoStart.CheckOnClick = true;
         miAutoStart.Checked = cfg.AutoStart;
-        miAutoStart.Click += new EventHandler(delegate
-        {
-            cfg.AutoStart = miAutoStart.Checked;
-            cfg.Save();
-            ApplyAutoStart(cfg.AutoStart);
-        });
+        miAutoStart.Click += new EventHandler(delegate { SetAutoStart(miAutoStart.Checked); });
 
-        ToolStripMenuItem miIcons = new ToolStripMenuItem("显示播放图标");
-        miIcons.CheckOnClick = true;
-        miIcons.Checked = cfg.ShowIcons;
-        miIcons.Click += new EventHandler(delegate
-        {
-            cfg.ShowIcons = miIcons.Checked;
-            cfg.Save();
-        });
-
-        ToolStripMenuItem miUpdate = new ToolStripMenuItem("检查更新");
-        miUpdate.Click += new EventHandler(delegate { CheckUpdate(true); });
+        ToolStripMenuItem restart = new ToolStripMenuItem("重启");
+        restart.Click += new EventHandler(delegate { Restart(); });
 
         ToolStripMenuItem exit = new ToolStripMenuItem("退出");
         exit.Click += new EventHandler(delegate { Shutdown(); });
 
-        menu.Items.Add(miShow);
-        menu.Items.Add(miIcons);
-        menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add(play);
-        menu.Items.Add(prev);
-        menu.Items.Add(next);
-        menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add(left);
-        menu.Items.Add(right);
-        menu.Items.Add(up);
-        menu.Items.Add(down);
-        menu.Items.Add(reset);
-        menu.Items.Add(bigger);
-        menu.Items.Add(smaller);
-        menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add(miAutoStart);
-        menu.Items.Add(miUpdate);
         menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add(restart);
         menu.Items.Add(exit);
 
         menu.Opening += new System.ComponentModel.CancelEventHandler(delegate
         {
-            miShow.Checked = cfg.Enabled;
             miAutoStart.Checked = cfg.AutoStart;
-            play.Text = state.Playing ? "暂停" : "播放";
         });
 
         tray.ContextMenuStrip = menu;
@@ -178,11 +104,79 @@ class TrayApp
             try { System.Diagnostics.Process.Start("https://github.com/Qing-qiuqm/BodianLyrics/releases/latest"); }
             catch { }
         });
-        tray.DoubleClick += new EventHandler(delegate
+        // 左键单击弹出设置窗口
+        tray.MouseClick += new MouseEventHandler(delegate(object sender, MouseEventArgs e)
         {
-            overlay.SetVisible(!cfg.Enabled);
-            miShow.Checked = cfg.Enabled;
+            if (e.Button == MouseButtons.Left) ShowSettings();
         });
+    }
+
+    // ---- 供设置窗口调用的公开接口 ----
+
+    public Config Cfg
+    {
+        get { return cfg; }
+    }
+
+    /// <summary>把配置写回 config.ini，并立即重排歌词窗</summary>
+    public void ApplyConfig()
+    {
+        cfg.Save();
+        overlay.Reposition();
+    }
+
+    public void SetLyricsVisible(bool on)
+    {
+        overlay.SetVisible(on);
+    }
+
+    public void PlayPrev() { controller.ClickPrevious(); }
+
+    public void PlayPause() { controller.ClickPlayPause(); }
+
+    public void PlayNext() { controller.ClickNext(); }
+
+    public void SetAutoStart(bool on)
+    {
+        cfg.AutoStart = on;
+        cfg.Save();
+        ApplyAutoStart(on);
+    }
+
+    public void CheckUpdateManual()
+    {
+        CheckUpdate(true);
+    }
+
+    void ShowSettings()
+    {
+        try
+        {
+            if (settings != null && !settings.IsDisposed)
+            {
+                settings.LoadValues();
+                settings.Show();
+                settings.WindowState = FormWindowState.Normal;
+                settings.Activate();
+                return;
+            }
+            settings = new SettingsForm(this);
+            settings.Show();
+        }
+        catch { }
+    }
+
+    /// <summary>重启自身：先释放单实例互斥体，再拉起新进程</summary>
+    void Restart()
+    {
+        try
+        {
+            cfg.Save();
+            Program.ReleaseInstanceMutex();
+            System.Diagnostics.Process.Start(Application.ExecutablePath);
+        }
+        catch { }
+        Shutdown();
     }
 
     static Icon BuildIcon()
