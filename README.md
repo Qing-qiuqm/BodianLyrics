@@ -16,7 +16,7 @@
 | 点击播控 | 点歌词 = 播放 / 暂停；点左侧 = 上一首；点右侧 = 下一首 |
 | 两侧媒体图标 | 胶囊两端绘制 ⏮ / ⏭，与文字同一条垂直中轴线，托盘里可一键关闭 |
 | 托盘菜单 | 显示歌词、显示播放图标、播放 / 暂停、上一首、下一首、左右上下微调、恢复默认位置、字号 ±1、开机自启、退出 |
-| 配置持久化 | 位置、字号、主题色、延迟、各开关全部写入 `config.ini` |
+| 配置持久化 | 位置、字号、主题色、延迟、字体、各开关全部写入 `config.ini` |
 
 ## 界面效果
 
@@ -75,6 +75,7 @@
 - `SHAppBarMessage(ABM_GETTASKBARPOS)` 取任务栏矩形与停靠边，跟随任务栏定位（上 / 下都行）
 - `WS_EX_LAYERED | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW`，用 `UpdateLayeredWindow` 推预乘 32bpp DIB
 - 不注册 `WS_EX_TRANSPARENT`，而是在 `WM_NCHITTEST` 里按「是否在胶囊内 + 在文字左 / 中 / 右」返回 `HTCLIENT` 或 `HTTRANSPARENT`：歌词条可点，其余位置不挡住任务栏
+- 字体：`config.ini` 的 `FontName` 留空时自动选择——优先用系统已装的苹方（`苹方 中等` / `苹方 常规` / `PingFang SC`），否则回退到微软雅黑粗体；指定字体名时直接使用（需系统已安装）
 
 ## 构建
 
@@ -100,6 +101,7 @@ powershell -ExecutionPolicy Bypass -File build.ps1
 | `ShowPill` | 是否绘制胶囊底 | 1 |
 | `ShowIcons` | 是否显示两侧 ⏮ / ⏭ 图标 | 1 |
 | `Latency` | 日志事件与真实出声的偏差（秒），自动学习 | 0 |
+| `FontName` | 歌词字体名，留空自动选择（优先苹方，回退微软雅黑）；填系统已安装的字体名即可 | （空） |
 
 ## 已知限制
 
