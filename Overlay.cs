@@ -463,6 +463,15 @@ class LyricOverlay
             pillL = pl;
             pillR = pr;
 
+            // 分层窗口的鼠标命中按像素 alpha 判定：alpha=0 处直接穿透，
+            // 所以整块热区先铺一层 alpha=1 的底，保证上一首 / 下一首和播放区始终可点。
+            // alpha=1 在屏幕上不可见，不会影响观感。
+            RectangleF hitRect = new RectangleF(pl, (h - th) / 2f - 6, pr - pl, th + 10);
+            using (SolidBrush hitBrush = new SolidBrush(Color.FromArgb(1, 0, 0, 0)))
+            {
+                g.FillRectangle(hitBrush, hitRect);
+            }
+
             if (cfg.ShowPill)
             {
                 RectangleF pill = new RectangleF(pl, (h - th) / 2f - 6, pr - pl, th + 10);
