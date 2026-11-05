@@ -11,6 +11,7 @@ class LyricsLine
     public double End;
     public string Text = "";
     public double[] Times;
+    /// <summary>本行是否带逐字标签</summary>
     public bool Timed = false;
 }
 
@@ -59,7 +60,10 @@ static class LrcParser
         LyricsData data = new LyricsData();
         if (raw == null || raw.Length == 0) return data;
         string[] rows = raw.Replace("\r", "").Split('\n');
+
         double offset = 0;
+
+        // 先读全局 offset 和标题信息
         for (int i = 0; i < rows.Length; i++)
         {
             Match off = OffsetRx.Match(rows[i]);
@@ -69,16 +73,21 @@ static class LrcParser
             Match ar = ArRx.Match(rows[i]);
             if (ar.Success && data.Artist.Length == 0) data.Artist = ar.Groups[1].Value.Trim();
         }
+
         for (int i = 0; i < rows.Length; i++)
         {
             string row = rows[i];
             Match tm = TimeRx.Match(row);
             if (!tm.Success) continue;
+
             double lineStart = int.Parse(tm.Groups[1].Value) * 60.0 + double.Parse(tm.Groups[2].Value);
             lineStart += offset;
+
             string content = row.Substring(tm.Index + tm.Length);
+
             List<double> times = new List<double>();
             StringBuilder text = new StringBuilder();
+
             MatchCollection tags = TagRx.Matches(content);
             if (tags.Count == 0)
             {
@@ -91,7 +100,11 @@ static class LrcParser
             {
                 int firstTag = tags[0].Index;
                 string prefix = content.Substring(0, firstTag);
-                if (prefix.Length > 0) { for (int c = 0; c < prefix.Length; c++) times.Add(lineStart); text.Append(prefix); }
+                if (prefix.Length > 0)
+                {
+                    for (int c = 0; c < prefix.Length; c++) times.Add(lineStart);
+                    text.Append(prefix);
+                }
                 for (int t = 0; t < tags.Count; t++)
                 {
                     Match m = tags[t];
@@ -104,26 +117,43 @@ static class LrcParser
                     text.Append(seg);
                 }
             }
+
+            // 去掉首尾空白，并同步裁剪逐字时间
             string full = text.ToString();
             int head = 0, tail = full.Length;
             while (head < tail && char.IsWhiteSpace(full[head])) head++;
             while (tail > head && char.IsWhiteSpace(full[tail - 1])) tail--;
             if (tail <= head) continue;
+
             LyricsLine line = new LyricsLine();
             line.Start = lineStart;
             line.Timed = tags.Count > 0;
             line.Text = full.Substring(head, tail - head);
             line.Times = new double[line.Text.Length];
-            for (int c = 0; c < line.Text.Length; c++) { int src = head + c; line.Times[c] = (src < times.Count) ? times[src] : lineStart; }
-            for (int c = 1; c < line.Times.Length; c++) { if (line.Times[c] < line.Times[c - 1] + 0.02) line.Times[c] = line.Times[c - 1] + 0.02; }
+            for (int c = 0; c < line.Text.Length; c++)
+            {
+                int src = head + c;
+                line.Times[c] = (src < times.Count) ? times[src] : lineStart;
+            }
+
+            // 逐字时间保证单调，避免 AI 生成的标签回退导致高亮跳动
+            for (int c = 1; c < line.Times.Length; c++)
+            {
+                if (line.Times[c] < line.Times[c - 1] + 0.02) line.Times[c] = line.Times[c - 1] + 0.02;
+            }
             data.Lines.Add(line);
         }
+
         data.Lines.Sort(delegate(LyricsLine a, LyricsLine b) { return a.Start.CompareTo(b.Start); });
         for (int i = 0; i < data.Lines.Count; i++)
         {
             if (i + 1 < data.Lines.Count) data.Lines[i].End = data.Lines[i + 1].Start;
             else data.Lines[i].End = data.Lines[i].Start + 6.0;
         }
+
+        // 酷我逐字标签的时间刻度与我们这行的实际演唱时长对不上（AI 生成/多次转码导致），
+        // 直接按绝对时间渲染会出现“这一行还没扫完就换行”。这里保留行内的相对进度，
+        // 把它重新拉伸到 [Start, End] 区间，保证最后一个字正好在本行结束时唱完。
         for (int i = 0; i < data.Lines.Count; i++)
         {
             LyricsLine ln = data.Lines[i];
@@ -133,7 +163,10 @@ static class LrcParser
             double span = tN - t0;
             double real = ln.End - ln.Start;
             if (span < 0.3 || real < 0.2) continue;
-            for (int c = 0; c < ln.Times.Length; c++) ln.Times[c] = ln.Start + (ln.Times[c] - t0) / span * real;
+            for (int c = 0; c < ln.Times.Length; c++)
+            {
+                ln.Times[c] = ln.Start + (ln.Times[c] - t0) / span * real;
+            }
         }
         return data;
     }
@@ -142,11 +175,16 @@ static class LrcParser
 class LyricsProvider
 {
     readonly string cacheDir;
-    public LyricsProvider() { cacheDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "cache"); }
+
+    public LyricsProvider()
+    {
+        cacheDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "cache");
+    }
 
     public LyricsData Get(string id, string title)
     {
         if (id == null || id.Length == 0) return null;
+
         string file = Path.Combine(cacheDir, id + ".lrc");
         try
         {
@@ -154,12 +192,18 @@ class LyricsProvider
             {
                 string cached = File.ReadAllText(file, Encoding.UTF8);
                 if (cached == "NO_LYRICS") return null;
-                if (cached.Length > 0) { LyricsData d = LrcParser.Parse(cached); if (d.Lines.Count > 0) return d; }
+                if (cached.Length > 0)
+                {
+                    LyricsData d = LrcParser.Parse(cached);
+                    if (d.Lines.Count > 0) return d;
+                }
             }
         }
         catch { }
+
         string text = Request(id, title);
         if (text == null) text = Request(id, "");
+
         try
         {
             Directory.CreateDirectory(cacheDir);
@@ -167,6 +211,7 @@ class LyricsProvider
             else File.WriteAllText(file, text, Encoding.UTF8);
         }
         catch { }
+
         if (text == null) return null;
         return LrcParser.Parse(text);
     }
@@ -175,22 +220,33 @@ class LyricsProvider
     {
         try
         {
-            string q = "type=lyric&req=2&lrcx=1&rid=" + id + "&songname=" + songName + "&artist=&corp=kuwo&fromchannel=bodian";
+            string q = "type=lyric&req=2&lrcx=1&rid=" + id + "&songname=" + songName +
+                       "&artist=&corp=kuwo&fromchannel=bodian";
             string b64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(q));
             string url = "http://mlyric.kuwo.cn/mobi.s?f=bodian&q=" + Uri.EscapeDataString(b64);
+
             HttpWebRequest req = (HttpWebRequest)WebRequest.Create(url);
-            req.Timeout = 8000; req.ReadWriteTimeout = 8000;
+            req.Timeout = 8000;
+            req.ReadWriteTimeout = 8000;
             req.UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)";
+
             string json;
             using (HttpWebResponse resp = (HttpWebResponse)req.GetResponse())
             using (Stream s = resp.GetResponseStream())
-            using (StreamReader sr = new StreamReader(s, Encoding.UTF8)) { json = sr.ReadToEnd(); }
+            using (StreamReader sr = new StreamReader(s, Encoding.UTF8))
+            {
+                json = sr.ReadToEnd();
+            }
+
             Match m = Regex.Match(json, "\"content\":\"([^\"]+)\"");
             if (!m.Success) return null;
             string lrc = Encoding.UTF8.GetString(Convert.FromBase64String(m.Groups[1].Value));
             if (lrc.Length == 0) return null;
             return lrc;
         }
-        catch { return null; }
+        catch
+        {
+            return null;
+        }
     }
 }
