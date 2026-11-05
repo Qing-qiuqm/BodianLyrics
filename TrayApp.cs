@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.IO;
@@ -63,7 +63,7 @@ class TrayApp
     {
         tray = new NotifyIcon();
         tray.Icon = BuildIcon();
-        tray.Text = "波点任务栏歌词";
+        tray.Text = "波点音乐任务栏歌词 v" + Program.VERSION;
         tray.Visible = true;
 
         ContextMenuStrip menu = new ContextMenuStrip();
