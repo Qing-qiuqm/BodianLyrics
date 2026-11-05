@@ -12,7 +12,7 @@ class Config
     public int AccentB = 69;
     public bool Enabled = true;
     public bool AutoStart = false;
-    public bool ShowPill = true;
+    public bool ShowPill = false;
     /// <summary>是否显示歌词两侧的上一首 / 下一首图标</summary>
     public bool ShowIcons = true;
     /// <summary>日志播放事件与实际出声之间的偏差（秒），由进度条像素同步自动学习</summary>
