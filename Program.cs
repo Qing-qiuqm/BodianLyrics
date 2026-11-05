@@ -5,6 +5,8 @@ using System.Windows.Forms;
 
 static class Program
 {
+    public const string VERSION = "1.0.0";
+
     [DllImport("user32.dll")]
     private static extern bool SetProcessDpiAwarenessContext(IntPtr value);
 
@@ -29,7 +31,12 @@ static class Program
 
         bool created = false;
         Mutex mutex = new Mutex(true, "BodianLyrics_SingleInstance", out created);
-        if (!created) return;
+        if (!created)
+        {
+            MessageBox.Show("波点音乐任务栏歌词已在运行中。", "BodianLyrics",
+                MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
 
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
