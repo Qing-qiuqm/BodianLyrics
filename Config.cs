@@ -19,6 +19,8 @@ class Config
     public double Latency = 0;
     /// <summary>歌词字体名，留空则自动选择（优先苹方，回退微软雅黑）</summary>
     public string FontName = "";
+    /// <summary>上次检查更新的时间（ISO 格式），为空表示从未检查</summary>
+    public string LastUpdateCheck = "";
 
     public string FilePath;
 
@@ -55,6 +57,7 @@ class Config
                 else if (k == "ShowIcons") ShowIcons = ToBool(v, ShowIcons);
                 else if (k == "Latency") Latency = ToDouble(v, Latency);
                 else if (k == "FontName") FontName = v;
+                else if (k == "LastUpdateCheck") LastUpdateCheck = v;
             }
         }
         catch { }
@@ -80,6 +83,7 @@ class Config
                 w.WriteLine("ShowIcons=" + (ShowIcons ? "1" : "0"));
                 w.WriteLine("Latency=" + Latency.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture));
                 w.WriteLine("FontName=" + FontName);
+                w.WriteLine("LastUpdateCheck=" + LastUpdateCheck);
             }
         }
         catch { }
