@@ -5,7 +5,7 @@ using System.Windows.Forms;
 
 static class Program
 {
-    public const string VERSION = "1.0.0";
+    public const string VERSION = "0.0.2";
 
     [DllImport("user32.dll")]
     private static extern bool SetProcessDpiAwarenessContext(IntPtr value);
