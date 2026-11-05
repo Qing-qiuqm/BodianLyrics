@@ -2,6 +2,9 @@ using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.IO;
+using System.Net;
+using System.Text;
+using System.Text.RegularExpressions;
 using System.Windows.Forms;
 using Microsoft.Win32;
 
@@ -57,6 +60,12 @@ class TrayApp
         syncTimer.Start();
 
         ApplyAutoStart(cfg.AutoStart);
+
+        // 启动时若距上次检查超过 7 天（144h），自动检查更新
+        DateTime last;
+        bool needCheck = !DateTime.TryParse(cfg.LastUpdateCheck, out last)
+            || (DateTime.Now - last).TotalHours >= 144;
+        if (needCheck) CheckUpdate(false);
     }
 
     void BuildTray()
@@ -130,6 +139,9 @@ class TrayApp
             cfg.Save();
         });
 
+        ToolStripMenuItem miUpdate = new ToolStripMenuItem("检查更新");
+        miUpdate.Click += new EventHandler(delegate { CheckUpdate(true); });
+
         ToolStripMenuItem exit = new ToolStripMenuItem("退出");
         exit.Click += new EventHandler(delegate { Shutdown(); });
 
@@ -149,6 +161,7 @@ class TrayApp
         menu.Items.Add(smaller);
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add(miAutoStart);
+        menu.Items.Add(miUpdate);
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add(exit);
 
@@ -160,6 +173,11 @@ class TrayApp
         });
 
         tray.ContextMenuStrip = menu;
+        tray.BalloonTipClicked += new EventHandler(delegate
+        {
+            try { System.Diagnostics.Process.Start("https://github.com/Qing-qiuqm/BodianLyrics/releases/latest"); }
+            catch { }
+        });
         tray.DoubleClick += new EventHandler(delegate
         {
             overlay.SetVisible(!cfg.Enabled);
@@ -315,6 +333,90 @@ class TrayApp
                 if (on) key.SetValue("BodianLyrics", "\"" + Application.ExecutablePath + "\"");
                 else key.DeleteValue("BodianLyrics", false);
             }
+        }
+        catch { }
+    }
+
+    void CheckUpdate(bool manual)
+    {
+        cfg.LastUpdateCheck = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss");
+        cfg.Save();
+
+        System.Threading.ThreadPool.QueueUserWorkItem(delegate
+        {
+            try
+            {
+                string json;
+                HttpWebRequest req = (HttpWebRequest)WebRequest.Create(
+                    "https://api.github.com/repos/Qing-qiuqm/BodianLyrics/releases/latest");
+                req.Timeout = 8000;
+                req.ReadWriteTimeout = 8000;
+                req.UserAgent = "BodianLyrics/" + Program.VERSION;
+                using (HttpWebResponse resp = (HttpWebResponse)req.GetResponse())
+                using (Stream s = resp.GetResponseStream())
+                using (StreamReader sr = new StreamReader(s, Encoding.UTF8))
+                {
+                    json = sr.ReadToEnd();
+                }
+
+                Match m = Regex.Match(json, "\"tag_name\"\\s*:\\s*\"([^\"]+)\"");
+                if (!m.Success)
+                {
+                    if (manual) ShowBalloon("检查更新", "无法获取版本信息。", ToolTipIcon.Warning);
+                    return;
+                }
+
+                string tag = m.Groups[1].Value;
+                string latest = tag.StartsWith("v") ? tag.Substring(1) : tag;
+                string current = Program.VERSION;
+
+                if (CompareVersion(latest, current) > 0)
+                {
+                    ShowBalloon("发现新版本 v" + latest,
+                        "当前版本 v" + current + "，点击查看更新。", ToolTipIcon.Info);
+                }
+                else if (manual)
+                {
+                    ShowBalloon("已是最新版本", "当前版本 v" + current, ToolTipIcon.Info);
+                }
+            }
+            catch
+            {
+                if (manual) ShowBalloon("检查更新", "网络异常，请稍后重试。", ToolTipIcon.Warning);
+            }
+        });
+    }
+
+    static int CompareVersion(string a, string b)
+    {
+        string[] pa = a.Split('.');
+        string[] pb = b.Split('.');
+        int n = Math.Max(pa.Length, pb.Length);
+        for (int i = 0; i < n; i++)
+        {
+            int va = (i < pa.Length) ? ToInt(pa[i]) : 0;
+            int vb = (i < pb.Length) ? ToInt(pb[i]) : 0;
+            if (va != vb) return va.CompareTo(vb);
+        }
+        return 0;
+    }
+
+    static int ToInt(string s)
+    {
+        int v;
+        if (int.TryParse(s, out v)) return v;
+        return 0;
+    }
+
+    void ShowBalloon(string title, string text, ToolTipIcon icon)
+    {
+        try
+        {
+            if (tray == null) return;
+            tray.BalloonTipTitle = title;
+            tray.BalloonTipText = text;
+            tray.BalloonTipIcon = icon;
+            tray.ShowBalloonTip(8000);
         }
         catch { }
     }
