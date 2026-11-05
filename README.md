@@ -98,7 +98,7 @@ powershell -ExecutionPolicy Bypass -File build.ps1
 | `AccentR/G/B` | 已唱文字的主题色 | 255 / 122 / 69 |
 | `Enabled` | 是否显示歌词 | 1 |
 | `AutoStart` | 开机自启（写 HKCU Run） | 0 |
-| `ShowPill` | 是否绘制胶囊底 | 1 |
+| `ShowPill` | 是否绘制胶囊底（默认关闭，纯透明） | 0 |
 | `ShowIcons` | 是否显示两侧 ⏮ / ⏭ 图标 | 1 |
 | `Latency` | 日志事件与真实出声的偏差（秒），自动学习 | 0 |
 | `FontName` | 歌词字体名，留空自动选择（优先苹方，回退微软雅黑）；填系统已安装的字体名即可 | （空） |
