@@ -17,6 +17,8 @@ class Config
     public bool ShowIcons = true;
     /// <summary>日志播放事件与实际出声之间的偏差（秒），由进度条像素同步自动学习</summary>
     public double Latency = 0;
+    /// <summary>歌词字体名，留空则自动选择（优先苹方，回退微软雅黑）</summary>
+    public string FontName = "";
 
     public string FilePath;
 
@@ -52,6 +54,7 @@ class Config
                 else if (k == "ShowPill") ShowPill = ToBool(v, ShowPill);
                 else if (k == "ShowIcons") ShowIcons = ToBool(v, ShowIcons);
                 else if (k == "Latency") Latency = ToDouble(v, Latency);
+                else if (k == "FontName") FontName = v;
             }
         }
         catch { }
@@ -76,6 +79,7 @@ class Config
                 w.WriteLine("ShowPill=" + (ShowPill ? "1" : "0"));
                 w.WriteLine("ShowIcons=" + (ShowIcons ? "1" : "0"));
                 w.WriteLine("Latency=" + Latency.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture));
+                w.WriteLine("FontName=" + FontName);
             }
         }
         catch { }
