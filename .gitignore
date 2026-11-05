@@ -1,0 +1,9 @@
+BodianLyrics.exe
+*.exe
+*.pdb
+cache/
+*.log
+probe.txt
+.vs/
+obj/
+bin/
