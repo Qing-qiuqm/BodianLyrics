@@ -30,7 +30,7 @@ static class Program
         }
 
         bool created = false;
-        Mutex mutex = new Mutex(true, "BodianLyrics_SingleInstance", out created);
+        instanceMutex = new Mutex(true, "BodianLyrics_SingleInstance", out created);
         if (!created)
         {
             MessageBox.Show("波点音乐任务栏歌词已在运行中。", "BodianLyrics",
@@ -43,5 +43,21 @@ static class Program
         TrayApp app = new TrayApp();
         app.Start();
         Application.Run();
+    }
+
+    static Mutex instanceMutex;
+
+    /// <summary>重启前释放单实例互斥体，否则新进程会被判定为重复启动</summary>
+    public static void ReleaseInstanceMutex()
+    {
+        Mutex m = instanceMutex;
+        instanceMutex = null;
+        if (m == null) return;
+        try
+        {
+            m.ReleaseMutex();
+            m.Close();
+        }
+        catch { }
     }
 }
